@@ -79,6 +79,14 @@ private struct TaskRowView: View {
       Text(task.title)
         .font(.headline)
 
+      // Summary
+      if let summary = task.summary, !summary.isEmpty {
+        Text(summary)
+          .font(.footnote)
+          .foregroundStyle(.secondary)
+          .lineLimit(2)
+      }
+
       // Deadline and Estimate
       HStack(spacing: 12) {
         if let deadline = task.deadline {
