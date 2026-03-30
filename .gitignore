@@ -1,0 +1,38 @@
+# Xcode
+# -----------------------
+# Build files (ビルド時に自動生成されるファイル)
+build/
+DerivedData/
+
+# Xcode user-specific files (個人設定ファイル - 他の人には不要)
+*.xcuserstate
+xcuserdata/
+
+# Xcode workspace settings (ワークスペースの個人設定)
+*.xcworkspace/xcuserdata/
+
+# Swift Package Manager
+# -----------------------
+# SPM の依存パッケージ (自動でダウンロードされるので不要)
+.build/
+Packages/
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+.swiftpm/
+
+# CocoaPods (もし使う場合)
+# -----------------------
+Pods/
+
+# macOS system files (macOSが自動生成するファイル)
+# -----------------------
+.DS_Store
+*.swp
+*~
+
+# VS Code settings (VS Codeの個人設定)
+# -----------------------
+.vscode/
+
+# Gemini AI
+# -----------------------
+.gemini/
