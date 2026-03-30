@@ -107,8 +107,8 @@ class ScheduleViewModel {
     let now = Date()
     let currentHour = calendar.component(.hour, from: now)
 
-    // If after 6 PM, schedule for tomorrow; otherwise, today
-    let targetDayOffset = currentHour >= 18 ? 1 : 0
+    // If after 12 PM, schedule for tomorrow; otherwise, today
+    let targetDayOffset = currentHour >= 12 ? 1 : 0
     guard let targetDayDate = calendar.date(byAdding: .day, value: targetDayOffset, to: now),
       let startOfActive = calendar.date(
         bySettingHour: activeStartHour, minute: 0, second: 0, of: targetDayDate),
@@ -124,6 +124,7 @@ class ScheduleViewModel {
     // 2. Create prompt for OpenAI
     let prompt = constructAIPrompt(
       targetDate: targetDayDate,
+      currentTime: now,
       startHour: activeStartHour,
       endHour: activeEndHour,
       tasks: pendingTasks,
@@ -188,6 +189,7 @@ class ScheduleViewModel {
   /// Constructs the prompt for the AI
   private func constructAIPrompt(
     targetDate: Date,
+    currentTime: Date,
     startHour: Int,
     endHour: Int,
     tasks: [TaskResponse],
@@ -197,9 +199,13 @@ class ScheduleViewModel {
     df.dateFormat = "yyyy-MM-dd"
     let dateString = df.string(from: targetDate)
 
+    let tf = DateFormatter()
+    tf.dateFormat = "HH:mm"
+    let currentTimeString = tf.string(from: currentTime)
+
     // Prepare task list for the prompt
     let taskListString = tasks.map {
-      "- ID: \($0.id), Title: \($0.title), Estimate: \($0.estimate_minutes ?? defaultEstimateMinutes)m, Priority: \($0.priority_label ?? "中"), Summary: \($0.summary ?? "")"
+      "- ID: \($0.id), Title: \($0.title), Estimate: \($0.estimate_minutes ?? defaultEstimateMinutes)m, Priority: \($0.priority_label ?? "中"), Deadline: \($0.deadline ?? "None"), Summary: \($0.summary ?? "")"
     }.joined(separator: "\n")
 
     // Prepare event list for the prompt
@@ -209,21 +215,49 @@ class ScheduleViewModel {
 
     return """
       You are a professional time management assistant.
-      Please realistically schedule the user's incomplete tasks during free time on the calendar.
+      Please realistically schedule the user's incomplete tasks during free time on the calendar with a focus on QUALITY and SUSTAINABILITY.
+
+      # STRICT ZERO OVERLAP POLICY
+      - ABSOLUTELY NO OVERLAPS are allowed.
+      - Each suggested_slot must have a distinct start and end time.
+      - A suggested_slot must never overlap with another suggested_slot.
+      - A suggested_slot must never overlap with a FIXED_NON_NEGOTIABLE_EVENTS.
+      - Any plan with an overlap is a FAILURE.
+
+      # Flexible Scheduling Rules
+      - **Partial Progress**: You do NOT have to schedule the full "Estimate" for a task in one sitting. If a task is estimated at 60m but only 30m fits, you can schedule a 30m "chunk" of work.
+      - **Selective Scheduling**: You do NOT have to schedule every task listed. Only include tasks that fit realistically without overcrowding.
+      - **Buffers**: Ensure a minimum 5-10 minute buffer between any two consecutive items (tasks or events).
 
       # Prerequisites
+      - Current Time: \(currentTimeString)
       - Target Date: \(dateString)
       - Active Hours: \(startHour):00 - \(endHour):00
+      - STRICTION: If the Target Date is today, do NOT schedule tasks before the Current Time (\(currentTimeString)).
       - Lunch time (around 12 PM) and dinner time (around 7 PM) will not be added as events, but create a realistic plan that doesn't overcrowd those times.
-      - Insert 5-15 minute breaks (buffers) before and after tasks, depending on the task's difficulty and length.
       - If the content suggests "going out" or "traveling" (based on title or summary), allow extra time for travel before and after.
-      - Carefully read the task title and summary, and allocate more time for tasks that seem difficult (even if it exceeds the estimate).
+      - Carefully read the task title and summary to understand context and difficulty.
 
       # List of Incomplete Tasks
       \(taskListString)
 
-      # Existing Events
-      \(eventListString.isEmpty ? "None" : eventListString)
+      # FIXED_NON_NEGOTIABLE_EVENTS (Current Calendar Status)
+      \(eventListString.isEmpty ? "No events scheduled." : eventListString)
+
+      # Task Triaging & Prioritization Rules
+      1. **Actionability Check**: Analyze each task's "Summary". If a task's summary indicates it is not yet actionable (e.g., "Wait for X", "Pending Y", or clear prerequisites not met), do NOT schedule it today.
+      2. **Triaging Strategy**: Comprehensively evaluate "Priority", "Deadline", and "Summary".
+         - High Priority + Near Deadline: Schedule early or in a prime slot.
+         - Preparation tasks: Schedule before the related FIXED_NON_NEGOTIABLE_EVENTS.
+         - Complex tasks: Schedule when there is a larger free time block.
+      3. **Selective Scheduling**: Focus on producing a high-quality, achievable schedule rather than forcing every task into one day.
+
+      # Context-Aware Scheduling Instructions
+      1. Analyze the "Summary" of each task for dependencies or logical connections with FIXED_NON_NEGOTIABLE_EVENTS.
+      2. If a task mentions "preparation," "meeting," or "follow-up," schedule it relative to the corresponding calendar event (e.g., preparation tasks should happen BEFORE the meeting).
+      3. Identify the free time "gaps" between the FIXED_NON_NEGOTIABLE_EVENTS and the Active Hours boundaries.
+      4. Strictly place tasks ONLY within those gaps.
+      5. Verify that NO suggested_slot overlaps with any FIXED_NON_NEGOTIABLE_EVENTS or another suggested_slot.
 
       # Output Format
       Please respond only in the following JSON format.
@@ -235,7 +269,7 @@ class ScheduleViewModel {
             "task_id": "Task ID",
             "start_time": "Start date and time in ISO8601 format (e.g., 2024-03-31T09:00:00+09:00)",
             "end_time": "End date and time in ISO8601 format (e.g., 2024-03-31T10:00:00+09:00)",
-            "reason": "Brief reason for placement at this time and considerations made"
+            "reason": "Brief Japanese reason for placement at this time and considerations made"
           }
         ]
       }

@@ -5,6 +5,7 @@ import Foundation
 class CalendarService {
   static let shared = CalendarService()
   private let eventStore = EKEventStore()
+  private let calendarName = "Task Management"
 
   private init() {}
 
@@ -57,34 +58,66 @@ class CalendarService {
 
   /// Add an event to the calendar
   func saveEvent(title: String, startDate: Date, endDate: Date, notes: String?) throws {
-    // 権限があるか一度確認
+    // Check if permission is granted
     guard
       EKEventStore.authorizationStatus(for: .event) == .authorized
         || EKEventStore.authorizationStatus(for: .event) == .fullAccess
     else {
       throw NSError(
         domain: "CalendarService", code: 1,
-        userInfo: [NSLocalizedDescriptionKey: "カレンダーのアクセス権限がありません"])
+        userInfo: [NSLocalizedDescriptionKey: "Calendar access denied"])
     }
 
-    let calendars = eventStore.calendars(for: .event)
-    // Fetch the default calendar or a writable calendar
-    guard
-      let defaultCalendar = eventStore.defaultCalendarForNewEvents
-        ?? calendars.first(where: { $0.allowsContentModifications })
-    else {
+    let targetCalendar: EKCalendar?
+    do {
+      targetCalendar = try findOrCreateCalendar()
+    } catch {
+      print(
+        "⚠️ [CalendarService] Failed to find/create 'Task Management' calendar: \(error.localizedDescription). Falling back to default."
+      )
+      targetCalendar = eventStore.defaultCalendarForNewEvents
+    }
+
+    guard let finalCalendar = targetCalendar else {
       throw NSError(
         domain: "CalendarService", code: 2,
-        userInfo: [NSLocalizedDescriptionKey: "書き込み可能なカレンダーが見つかりません"])
+        userInfo: [NSLocalizedDescriptionKey: "No writable calendar found"])
     }
 
     let newEvent = EKEvent(eventStore: eventStore)
-    newEvent.calendar = defaultCalendar
+    newEvent.calendar = finalCalendar
     newEvent.title = title
     newEvent.startDate = startDate
     newEvent.endDate = endDate
     newEvent.notes = notes
 
     try eventStore.save(newEvent, span: .thisEvent, commit: true)
+  }
+
+  /// Find or create the "Task Management" calendar
+  private func findOrCreateCalendar() throws -> EKCalendar {
+    let calendars = eventStore.calendars(for: .event)
+    if let existing = calendars.first(where: { $0.title == calendarName }) {
+      return existing
+    }
+
+    // Not found, create it
+    let newCalendar = EKCalendar(for: .event, eventStore: eventStore)
+    newCalendar.title = calendarName
+
+    // Choose a suitable source (prefer iCloud/CalDAV, then Local)
+    let sources = eventStore.sources
+    if let bestSource = sources.first(where: { $0.sourceType == .calDAV })
+      ?? sources.first(where: { $0.sourceType == .local }) ?? sources.first
+    {
+      newCalendar.source = bestSource
+    } else {
+      throw NSError(
+        domain: "CalendarService", code: 3,
+        userInfo: [NSLocalizedDescriptionKey: "No suitable calendar source found"])
+    }
+
+    try eventStore.saveCalendar(newCalendar, commit: true)
+    return newCalendar
   }
 }
