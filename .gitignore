@@ -33,6 +33,10 @@ Pods/
 # -----------------------
 .vscode/
 
+# App config (実際の設定値を含むため Git 管理外)
+# -----------------------
+daily-tasks/Config.plist
+
 # Gemini AI
 # -----------------------
 .gemini/
