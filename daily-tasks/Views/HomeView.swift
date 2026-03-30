@@ -1,38 +1,41 @@
 import SwiftUI
 
-/// ホーム画面 — 各機能への導線を提供する
-/// 将来的にスケジュール提案などを追加する「ハブ」として機能する
+/// アプリのメインとなるタブ画面
 struct HomeView: View {
-    var body: some View {
-        NavigationStack {
-            List {
-                // メイン機能
-                Section {
-                    NavigationLink {
-                        TaskListView()
-                    } label: {
-                        Label("タスク一覧", systemImage: "list.bullet")
-                    }
+  // 0: タスク一覧, 1: タスク追加, 2: スケジュール提案
+  @State private var selectedTab = 0
 
-                    NavigationLink {
-                        TaskAddView()
-                    } label: {
-                        Label("タスク追加", systemImage: "plus.circle")
-                    }
-                }
+  var body: some View {
+    TabView(selection: $selectedTab) {
+      // 1. タスク一覧タブ
+      NavigationStack {
+        TaskListView()
+      }
+      .tabItem {
+        Label("タスク一覧", systemImage: "list.bullet")
+      }
+      .tag(0)
 
-                // 将来の拡張エリア
-                // スケジュール提案機能はここに NavigationLink を追加する
-                Section("Coming Soon") {
-                    Label("スケジュール提案", systemImage: "calendar.badge.clock")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .navigationTitle("Daily Tasks")
+      // 2. タスク追加タブ
+      // 追加完了時に一覧タブ(0)に戻れるよう `$selectedTab` を渡す
+      NavigationStack {
+        TaskAddView(selectedTab: $selectedTab)
+      }
+      .tabItem {
+        Label("タスク追加", systemImage: "plus.circle")
+      }
+      .tag(1)
+
+      // 3. スケジュール提案タブ（プレースホルダー）
+      ScheduleView()
+        .tabItem {
+          Label("スケジュール", systemImage: "calendar.badge.clock")
         }
+        .tag(2)
     }
+  }
 }
 
 #Preview {
-    HomeView()
+  HomeView()
 }
