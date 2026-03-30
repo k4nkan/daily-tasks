@@ -1,7 +1,7 @@
 import EventKit
 import SwiftUI
 
-/// スケジュール提案画面
+/// Schedule Proposal Screen
 struct ScheduleView: View {
   @State private var viewModel = ScheduleViewModel()
 
@@ -27,9 +27,9 @@ struct ScheduleView: View {
             description: Text(error)
           )
         } else {
-          // スケジュールのタイムライン表示
+          // Timeline display of the schedule
           List {
-            // 日付ごとにセクションを分ける (今回は1日分のみ)
+            // Separate sections by date (only one day in this version)
             let sortedDays = viewModel.scheduleSlots.keys.sorted()
             ForEach(sortedDays, id: \.self) { day in
               Section(header: Text(day, style: .date).font(.headline)) {
@@ -73,22 +73,22 @@ struct ScheduleView: View {
         Text(viewModel.exportAlertMessage ?? "")
       }
       .task {
-        // 画面表示時にスケジュールの生成を開始
+        // Start generating the schedule when the screen appears
         await viewModel.loadAndSchedule()
       }
     }
   }
 }
 
-// MARK: - タイムラインの1行分
+// MARK: - Single Timeline Row
 
-/// スケジュールの1枠を表示するビュー
+/// View displaying a single slot of the schedule
 private struct ScheduleSlotRow: View {
   let slot: ScheduleSlot
 
   var body: some View {
     HStack(alignment: .top, spacing: 12) {
-      // 時間表示 (左側)
+      // Time display (Left side)
       VStack(alignment: .trailing, spacing: 2) {
         Text(slot.startTime.formatted(date: .omitted, time: .shortened))
           .font(.subheadline)
@@ -99,19 +99,19 @@ private struct ScheduleSlotRow: View {
       }
       .frame(width: 50, alignment: .trailing)
 
-      // 縦線
+      // Vertical line
       Rectangle()
         .fill(lineColor.opacity(0.3))
         .frame(width: 2)
 
-      // コンテンツ表示 (右側)
+      // Content display (Right side)
       VStack(alignment: .leading, spacing: 4) {
         switch slot.type {
         case .calendarEvent(let event):
           Text(event.title)
             .font(.subheadline)
             .foregroundStyle(.secondary)
-            .strikethrough()  // カレンダーの予定は控えめに表示
+            .strikethrough()  // Calendar events are displayed subtly
 
         case .task(let task):
           Text(task.title)
@@ -149,7 +149,7 @@ private struct ScheduleSlotRow: View {
     .padding(.vertical, 4)
   }
 
-  // 色設定
+  // Color settings
   private var lineColor: Color {
     switch slot.type {
     case .calendarEvent: return .gray
@@ -168,7 +168,7 @@ private struct ScheduleSlotRow: View {
   }
 }
 
-/// 小さなバッジ表示用の汎用View
+/// Generic view for small badge display
 private struct BadgeView: View {
   let text: String
   let color: Color

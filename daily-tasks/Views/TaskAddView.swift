@@ -1,20 +1,20 @@
 import SwiftUI
 
-/// タスク追加画面 — フォーム入力して POST /api/tasks に送信する
+/// Task addition screen — form input to send POST /api/tasks
 struct TaskAddView: View {
-  /// 完了後にタブを「タスク一覧(0)」に戻すための Binding
+  /// Binding to return to the "Tasks (0)" tab after completion
   @Binding var selectedTab: Int
   @State private var viewModel = TaskAddViewModel()
 
   var body: some View {
     Form {
-      // 基本情報セクション
+      // Basic Info Section
       Section("基本情報") {
         TextField("タイトル（必須）", text: $viewModel.title)
         TextField("概要", text: $viewModel.summary)
       }
 
-      // 締切設定（カレンダー）
+      // Deadline Setting (Calendar)
       Section("締切") {
         Toggle("締切日を設定する", isOn: $viewModel.hasDeadline)
 
@@ -24,7 +24,7 @@ struct TaskAddView: View {
         }
       }
 
-      // 見積もり
+      // Estimate
       Section("見積もり") {
         Picker("見積もり時間", selection: $viewModel.estimateLabel) {
           Text("未選択").tag("")
@@ -34,7 +34,7 @@ struct TaskAddView: View {
         }
       }
 
-      // 重要度
+      // Priority
       Section("重要度") {
         Picker("重要度", selection: $viewModel.priorityLabel) {
           Text("未選択").tag("")
@@ -44,7 +44,7 @@ struct TaskAddView: View {
         }
       }
 
-      // ステータス
+      // Status
       Section("ステータス") {
         Picker("ステータス", selection: $viewModel.status) {
           ForEach(TaskAddViewModel.statusOptions, id: \.self) { option in
@@ -53,7 +53,7 @@ struct TaskAddView: View {
         }
       }
 
-      // エラーメッセージ
+      // Error Message
       if let error = viewModel.errorMessage {
         Section {
           Text(error)
@@ -61,12 +61,12 @@ struct TaskAddView: View {
         }
       }
 
-      // 送信ボタン
+      // Submit Button
       Section {
         Button {
           Task {
             await viewModel.submit()
-            // 成功したらフォームをリセットし、タスク一覧タブに戻る
+            // Reset form and return to the task list tab on success
             if viewModel.didSubmitSuccessfully {
               viewModel.resetForm()
               selectedTab = 0

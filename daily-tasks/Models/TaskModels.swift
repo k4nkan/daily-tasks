@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - APIレスポンス用モデル（GET /api/tasks）
+// MARK: - API Response Model (GET /api/tasks)
 
 struct TaskResponse: Codable, Identifiable {
   let id: String
@@ -15,7 +15,7 @@ struct TaskResponse: Codable, Identifiable {
   let status: String?
 }
 
-// MARK: - タスク追加リクエスト用モデル（POST /api/tasks）
+// MARK: - Task Creation Request Model (POST /api/tasks)
 
 struct TaskCreateRequest: Codable {
   let title: String

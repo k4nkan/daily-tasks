@@ -1,14 +1,14 @@
 import EventKit
 import Foundation
 
-/// カレンダーから予定を取得するサービスクラス
+/// Service class to fetch events from the calendar
 class CalendarService {
   static let shared = CalendarService()
   private let eventStore = EKEventStore()
 
   private init() {}
 
-  /// カレンダーへのアクセス権限を要求する
+  /// Request access permission to the calendar
   func requestAccess() async throws -> Bool {
     let status = EKEventStore.authorizationStatus(for: .event)
 
@@ -17,25 +17,25 @@ class CalendarService {
       return true
     case .notDetermined:
       if #available(iOS 17.0, *) {
-        // iOS 17以降は fullAccess または writeOnly を要求
+        // iOS 17 and later require fullAccess or writeOnly
         let granted = try await eventStore.requestFullAccessToEvents()
         return granted
       } else {
-        // iOS 16以前
+        // iOS 16 and earlier
         let granted = try await eventStore.requestAccess(to: .event)
         return granted
       }
     case .denied, .restricted, .writeOnly:
-      // 読み込みが必要なため、writeOnlyでは不十分
+      // writeOnly is insufficient since reading is required
       return false
     @unknown default:
       return false
     }
   }
 
-  /// 指定した期間のカレンダーイベントを取得する
+  /// Fetch calendar events for a specified period
   func fetchEvents(startDate: Date, endDate: Date) -> [EKEvent] {
-    // 権限があるか一度確認
+    // Check if permission is granted
     guard
       EKEventStore.authorizationStatus(for: .event) == .fullAccess
         || EKEventStore.authorizationStatus(for: .event) == .authorized
@@ -44,18 +44,18 @@ class CalendarService {
     }
 
     let calendars = eventStore.calendars(for: .event)
-    // カレンダーがない、または取得できない場合
+    // If no calendar exists or cannot be fetched
     guard !calendars.isEmpty else { return [] }
 
     let predicate = eventStore.predicateForEvents(
       withStart: startDate, end: endDate, calendars: calendars)
     let events = eventStore.events(matching: predicate)
 
-    // 開始日時でソート
+    // Sort by start date
     return events.sorted { $0.startDate < $1.startDate }
   }
 
-  /// カレンダーに予定を追加する
+  /// Add an event to the calendar
   func saveEvent(title: String, startDate: Date, endDate: Date, notes: String?) throws {
     // 権限があるか一度確認
     guard
@@ -68,7 +68,7 @@ class CalendarService {
     }
 
     let calendars = eventStore.calendars(for: .event)
-    // デフォルトのカレンダー、もしくは書き込み可能なカレンダーを取得
+    // Fetch the default calendar or a writable calendar
     guard
       let defaultCalendar = eventStore.defaultCalendarForNewEvents
         ?? calendars.first(where: { $0.allowsContentModifications })

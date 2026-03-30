@@ -2,18 +2,18 @@ import EventKit
 import Foundation
 import Observation
 
-// MARK: - 定数設定
+// MARK: - Constants
 private let activeStartHour = 9
 private let activeEndHour = 22
 private let defaultEstimateMinutes = 60
 
-// MARK: - タイムスロットモデル
+// MARK: - Time Slot Model
 struct ScheduleSlot: Identifiable {
   let id = UUID()
   let startTime: Date
   let endTime: Date
   let type: SlotType
-  let reason: String?  // AIによる配置理由
+  let reason: String?  // Reason for AI placement
 
   enum SlotType {
     case calendarEvent(EKEvent)
@@ -22,7 +22,7 @@ struct ScheduleSlot: Identifiable {
   }
 }
 
-/// スケジュール（タスクの予定組み込み）のロジックを管理
+/// Manages the logic for scheduling (integrating tasks into the calendar)
 @Observable
 class ScheduleViewModel {
   var scheduleSlots: [Date: [ScheduleSlot]] = [:]
@@ -30,18 +30,21 @@ class ScheduleViewModel {
   var errorMessage: String?
   var hasCalendarAccess = false
 
-  // エクスポート用
+  // For Export
   var isExporting = false
   var exportAlertMessage: String?
   var showExportAlert = false
 
-  /// カレンダー権限の要求およびデータの取得を開始
+  /// Starts requesting calendar permissions and fetching data
   func loadAndSchedule() async {
-    isLoading = true
+    // Only show full-screen loading if we don't have slots yet
+    if scheduleSlots.isEmpty {
+      isLoading = true
+    }
     errorMessage = nil
 
     do {
-      // カレンダー権限の確認
+      // Check calendar permissions
       hasCalendarAccess = try await CalendarService.shared.requestAccess()
       if hasCalendarAccess {
         try await buildSchedule()
@@ -55,7 +58,7 @@ class ScheduleViewModel {
     isLoading = false
   }
 
-  /// カレンダーに予定を一括で書き込む
+  /// Batch writes events to the calendar
   func exportToCalendar() async {
     isExporting = true
     var successCount = 0
@@ -88,17 +91,23 @@ class ScheduleViewModel {
     showExportAlert = true
   }
 
-  /// OpenAI API を用いて、現実的で動的なスケジュールを生成する
+  /// Generates a realistic and dynamic schedule using the OpenAI API
   private func buildSchedule() async throws {
-    // 1. タスクと既存予定の取得
+    // 1. Fetch tasks and existing events
     let allTasks = try await APIClient.fetchTasks()
-    let pendingTasks = allTasks.filter { $0.status == "Not started" || $0.status == "In progress" }
+    let pendingTasks = allTasks.filter {
+      let status = $0.status?.lowercased() ?? ""
+      return status == "not started" || status == "in progress"
+    }
+
+    print(
+      "--- [ScheduleViewModel] Fetch count: \(allTasks.count) / Pending: \(pendingTasks.count) ---")
 
     let calendar = Calendar.current
     let now = Date()
     let currentHour = calendar.component(.hour, from: now)
 
-    // 夜18時以降なら翌日、それ以外は今日
+    // If after 6 PM, schedule for tomorrow; otherwise, today
     let targetDayOffset = currentHour >= 18 ? 1 : 0
     guard let targetDayDate = calendar.date(byAdding: .day, value: targetDayOffset, to: now),
       let startOfActive = calendar.date(
@@ -112,7 +121,7 @@ class ScheduleViewModel {
     let events = CalendarService.shared.fetchEvents(startDate: startOfActive, endDate: endOfActive)
     let dayKey = calendar.startOfDay(for: targetDayDate)
 
-    // 2. OpenAI へのプロンプト作成
+    // 2. Create prompt for OpenAI
     let prompt = constructAIPrompt(
       targetDate: targetDayDate,
       startHour: activeStartHour,
@@ -121,14 +130,23 @@ class ScheduleViewModel {
       existingEvents: events
     )
 
-    // 3. OpenAI API 呼び出し
+    // 3. call OpenAI API
     let openAIResponse = try await OpenAIService.shared.generateSchedule(prompt: prompt)
 
-    // 4. スケジュール枠への反映
+    print(
+      "--- [ScheduleViewModel] AI response received: \(openAIResponse.suggested_slots.count) slots ---"
+    )
+
+    // 4. Reflect in the schedule slots
     let isoFormatter = ISO8601DateFormatter()
+    // Support parsing strings without 'Z' or timezone by using natural options
+    isoFormatter.formatOptions = [
+      .withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime,
+    ]
+
     var newSlots: [ScheduleSlot] = []
 
-    // まず既存のカレンダー予定を追加
+    // First, add existing calendar events
     for event in events {
       newSlots.append(
         ScheduleSlot(
@@ -136,12 +154,21 @@ class ScheduleViewModel {
           reason: nil))
     }
 
-    // OpenAI が提案したタスク予定を追加
+    // Add task schedules proposed by OpenAI
     for suggested in openAIResponse.suggested_slots {
+      // Robust date parsing: if GPT misses the timezone, append '+09:00' (JST)
+      let startTimeStr =
+        suggested.start_time.contains("+") || suggested.start_time.contains("Z")
+        ? suggested.start_time : suggested.start_time + "+09:00"
+      let endTimeStr =
+        suggested.end_time.contains("+") || suggested.end_time.contains("Z")
+        ? suggested.end_time : suggested.end_time + "+09:00"
+
       guard let task = pendingTasks.first(where: { $0.id == suggested.task_id }),
-        let startDate = isoFormatter.date(from: suggested.start_time),
-        let endDate = isoFormatter.date(from: suggested.end_time)
+        let startDate = isoFormatter.date(from: startTimeStr),
+        let endDate = isoFormatter.date(from: endTimeStr)
       else {
+        print("❌ [ScheduleViewModel] Failed to parse slot for Task ID: \(suggested.task_id)")
         continue
       }
 
@@ -150,13 +177,15 @@ class ScheduleViewModel {
           startTime: startDate, endTime: endDate, type: .task(task), reason: suggested.reason))
     }
 
-    // 開始時間順にソート
+    // Sort by start time
     newSlots.sort { $0.startTime < $1.startTime }
+
+    print("--- [ScheduleViewModel] Total slots assigned: \(newSlots.count) ---")
 
     self.scheduleSlots = [dayKey: newSlots]
   }
 
-  /// AI 用のプロンプトを構築する
+  /// Constructs the prompt for the AI
   private func constructAIPrompt(
     targetDate: Date,
     startHour: Int,
@@ -168,41 +197,45 @@ class ScheduleViewModel {
     df.dateFormat = "yyyy-MM-dd"
     let dateString = df.string(from: targetDate)
 
+    // Prepare task list for the prompt
     let taskListString = tasks.map {
       "- ID: \($0.id), Title: \($0.title), Estimate: \($0.estimate_minutes ?? defaultEstimateMinutes)m, Priority: \($0.priority_label ?? "中"), Summary: \($0.summary ?? "")"
     }.joined(separator: "\n")
 
+    // Prepare event list for the prompt
     let eventListString = existingEvents.map {
       "- Title: \($0.title), Start: \($0.startDate.formatted(date: .omitted, time: .shortened)), End: \($0.endDate.formatted(date: .omitted, time: .shortened))"
     }.joined(separator: "\n")
 
     return """
-      あなたは優秀なタイムマネジメント・アシスタントです。
-      ユーザーの未完了タスクを、カレンダーの空き時間に現実的に配置してください。
+      You are a professional time management assistant.
+      Please realistically schedule the user's incomplete tasks during free time on the calendar.
 
-      # 前提条件
-      - 対象日: \(dateString)
-      - 活動時間制限: \(startHour):00 〜 \(endHour):00
-      - 昼食（12時頃）や夕食（19時頃）の時間は、予定として追加はしませんが、その時間にタスクを詰めすぎない現実的な計画にしてください。
-      - タスクの前後には 5〜15分の休憩（バッファ）を、タスクの難易度や長さに応じて挿入してください。
-      - 「外出」「移動」が想定される内容（タイトルや概要から判断）の場合、前後に移動時間を考慮した余裕を持たせてください。
-      - タスクのタイトルや概要（Summary）を詳しく読み取り、難易度が高そうなものは時間を長めに（見積もり以上でも可）確保してください。
+      # Prerequisites
+      - Target Date: \(dateString)
+      - Active Hours: \(startHour):00 - \(endHour):00
+      - Lunch time (around 12 PM) and dinner time (around 7 PM) will not be added as events, but create a realistic plan that doesn't overcrowd those times.
+      - Insert 5-15 minute breaks (buffers) before and after tasks, depending on the task's difficulty and length.
+      - If the content suggests "going out" or "traveling" (based on title or summary), allow extra time for travel before and after.
+      - Carefully read the task title and summary, and allocate more time for tasks that seem difficult (even if it exceeds the estimate).
 
-      # 未完了タスク一覧
+      # List of Incomplete Tasks
       \(taskListString)
 
-      # 既に決まっている予定
-      \(eventListString.isEmpty ? "なし" : eventListString)
+      # Existing Events
+      \(eventListString.isEmpty ? "None" : eventListString)
 
-      # 出力フォーマット
-      以下のJSON形式のみで回答してください。
+      # Output Format
+      Please respond only in the following JSON format.
+      Crucially, provide start_time and end_time in ISO8601 format WITH timezone offset (e.g., \"\(dateString)T09:00:00+09:00\").
+
       {
         "suggested_slots": [
           {
-            "task_id": "タスクのID",
-            "start_time": "ISO8601形式の開始日時",
-            "end_time": "ISO8601形式の終了日時",
-            "reason": "なぜこの時間に配置したか、どう考慮したかの簡潔な理由"
+            "task_id": "Task ID",
+            "start_time": "Start date and time in ISO8601 format (e.g., 2024-03-31T09:00:00+09:00)",
+            "end_time": "End date and time in ISO8601 format (e.g., 2024-03-31T10:00:00+09:00)",
+            "reason": "Brief reason for placement at this time and considerations made"
           }
         ]
       }

@@ -1,10 +1,10 @@
 import Foundation
 import Observation
 
-/// タスク追加画面のロジックを管理
+/// Manages the logic for the task addition screen
 @Observable
 class TaskAddViewModel {
-  // MARK: - フォーム入力値
+  // MARK: - Form Input Values
   var title = ""
   var summary = ""
   var hasDeadline = false
@@ -13,17 +13,17 @@ class TaskAddViewModel {
   var priorityLabel = ""
   var status = "Not started"
 
-  // MARK: - 送信状態
+  // MARK: - Submission State
   var isSubmitting = false
   var errorMessage: String?
   var didSubmitSuccessfully = false
 
-  // MARK: - 選択肢の定義（ユーザー指定の候補値）
+  // MARK: - Option Definitions (User-specified values)
   static let estimateOptions = ["- 0.5h", "- 1h", "- 1.5h", "- 2h", "- 3h", "- 4h", "4h -"]
   static let priorityOptions = ["高", "中", "低"]
   static let statusOptions = ["Not started", "In progress", "Done", "stop"]
 
-  /// 保存成功後にフォームを初期状態に戻す
+  /// Resets the form to the initial state after successful save
   func resetForm() {
     title = ""
     summary = ""
@@ -37,9 +37,9 @@ class TaskAddViewModel {
     didSubmitSuccessfully = false
   }
 
-  /// フォームの入力値を TaskCreateRequest に変換して POST する
+  /// Converts form input values to TaskCreateRequest and POSTs them
   func submit() async {
-    // バリデーション: タイトルは必須
+    // Validation: Title is required
     guard !title.isEmpty else {
       errorMessage = "タイトルを入力してください"
       return
@@ -49,7 +49,7 @@ class TaskAddViewModel {
     errorMessage = nil
     didSubmitSuccessfully = false
 
-    // 日付を yyyy-MM-dd 形式に変換
+    // Convert date to yyyy-MM-dd format
     let formattedDeadline: String? = {
       if hasDeadline {
         let formatter = DateFormatter()
@@ -61,7 +61,7 @@ class TaskAddViewModel {
       }
     }()
 
-    // 空文字は nil に変換してリクエストに含めない
+    // Convert empty strings to nil and exclude from request
     let request = TaskCreateRequest(
       title: title,
       summary: summary.isEmpty ? nil : summary,

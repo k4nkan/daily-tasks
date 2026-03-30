@@ -1,13 +1,13 @@
 import Foundation
 
-// MARK: - APIエラー定義
+// MARK: - API Error Definitions
 
 enum APIError: LocalizedError {
   case invalidURL
   case missingAPIKey
   case missingBaseURL
-  case unauthorized  // 401: APIキーが間違っている
-  case headerMissing  // 422: APIキーヘッダーがない
+  case unauthorized  // 401: Incorrect API Key
+  case headerMissing  // 422: Missing API Key header
   case httpError(Int)
   case decodingError(Error)
   case networkError(Error)
@@ -34,13 +34,13 @@ enum APIError: LocalizedError {
   }
 }
 
-// MARK: - APIクライアント
+// MARK: - API Client
 
-/// バックエンドAPIとの通信を担当
-/// enum + static methods で、インスタンス管理を不要にしている
+/// Handles communication with the backend API
+/// Uses enum + static methods to avoid instance management
 enum APIClient {
 
-  /// Config.plist の内容を辞書として読み込む（キャッシュ的に一度だけ）
+  /// Loads the contents of Config.plist as a dictionary (cached once)
   private static var configDict: [String: Any]? {
     guard let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
       let dict = NSDictionary(contentsOfFile: path) as? [String: Any]
@@ -50,19 +50,19 @@ enum APIClient {
     return dict
   }
 
-  /// Config.plist から baseURL を読み取る
+  /// Reads baseURL from Config.plist
   private static var baseURL: String? {
     configDict?["API_BASE_URL"] as? String
   }
 
-  /// Config.plist から API Key を読み取る
+  /// Reads API Key from Config.plist
   private static var apiKey: String? {
     configDict?["API_KEY"] as? String
   }
 
   // MARK: - Public Methods
 
-  /// タスク一覧を取得する（GET /api/tasks）
+  /// Fetches the task list (GET /api/tasks)
   static func fetchTasks() async throws -> [TaskResponse] {
     let data = try await performRequest(path: "/api/tasks", method: "GET")
 
@@ -73,7 +73,7 @@ enum APIClient {
     }
   }
 
-  /// タスクを追加する（POST /api/tasks）
+  /// Adds a task (POST /api/tasks)
   static func createTask(_ task: TaskCreateRequest) async throws {
     let body = try JSONEncoder().encode(task)
     _ = try await performRequest(path: "/api/tasks", method: "POST", body: body)
@@ -81,8 +81,8 @@ enum APIClient {
 
   // MARK: - Private
 
-  /// 共通のHTTPリクエスト処理
-  /// baseURL と apiKey を毎回チェックし、レスポンスのステータスコードでエラーを分岐する
+  /// Common HTTP request processing
+  /// Checks baseURL and apiKey every time and branches errors by response status code
   private static func performRequest(path: String, method: String, body: Data? = nil) async throws
     -> Data
   {
@@ -112,7 +112,7 @@ enum APIClient {
       throw APIError.networkError(NSError(domain: "HTTPError", code: -1))
     }
 
-    // ステータスコードに応じてエラーを返す
+    // Returns error based on status code
     guard (200...299).contains(httpResponse.statusCode) else {
       switch httpResponse.statusCode {
       case 401: throw APIError.unauthorized

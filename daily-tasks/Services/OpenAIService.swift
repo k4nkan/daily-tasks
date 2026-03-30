@@ -1,10 +1,10 @@
 import Foundation
 
-/// OpenAI API との通信を担当するサービス
+/// Service responsible for communicating with the OpenAI API
 class OpenAIService {
   static let shared = OpenAIService()
 
-  // Config.plist から API Key を読み取る
+  // Reads API Key from Config.plist
   private var apiKey: String? {
     guard let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
       let dict = NSDictionary(contentsOfFile: path) as? [String: Any]
@@ -16,7 +16,7 @@ class OpenAIService {
 
   private let baseURL = "https://api.openai.com/v1/chat/completions"
 
-  /// OpenAI にプロンプトを送信し、構造化されたスケジュール（JSON）を取得する
+  /// Sends a prompt to OpenAI and fetches a structured schedule (JSON)
   func generateSchedule(prompt: String) async throws -> AIScheduleResponse {
     guard let apiKey = apiKey else {
       throw NSError(
@@ -29,7 +29,7 @@ class OpenAIService {
         domain: "OpenAIService", code: 2, userInfo: [NSLocalizedDescriptionKey: "無効なURLです"])
     }
 
-    // リクエストボディの作成
+    // Create request body
     let requestBody: [String: Any] = [
       "model": "gpt-4o",
       "messages": [
@@ -57,7 +57,7 @@ class OpenAIService {
         userInfo: [NSLocalizedDescriptionKey: "OpenAI API エラー (HTTP \(httpResponse.statusCode))"])
     }
 
-    // OpenAI のレスポンスをパース
+    // Parse OpenAI response
     let decodedResponse: OpenAIResponse
     do {
       decodedResponse = try JSONDecoder().decode(OpenAIResponse.self, from: data)
@@ -76,7 +76,7 @@ class OpenAIService {
         userInfo: [NSLocalizedDescriptionKey: "OpenAI からの有効な回答が得られませんでした"])
     }
 
-    // JSON 文字列をデータに変換
+    // Convert JSON string to data
     guard let jsonData = jsonString.data(using: .utf8) else {
       print("❌ Failed to convert OpenAI text to UTF8 data: \(jsonString)")
       throw NSError(
@@ -94,7 +94,7 @@ class OpenAIService {
   }
 }
 
-// MARK: - OpenAI API 用のデータモデル
+// MARK: - Data Models for OpenAI API
 
 struct OpenAIResponse: Codable {
   let choices: [Choice]
@@ -108,7 +108,7 @@ struct OpenAIResponse: Codable {
   }
 }
 
-/// AI が返すスケジュールのフォーマット
+/// Format of the schedule returned by the AI
 struct AIScheduleResponse: Codable {
   let suggested_slots: [SuggestedSlot]
 
@@ -116,6 +116,6 @@ struct AIScheduleResponse: Codable {
     let task_id: String
     let start_time: String  // ISO8601
     let end_time: String  // ISO8601
-    let reason: String?  // なぜその時間に配置したかの理由
+    let reason: String?  // Reason for placing at that time
   }
 }

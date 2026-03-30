@@ -1,53 +1,62 @@
 # Daily Tasks
 
-Notion のタスクDBをバックエンドAPI経由で取得・追加する iOS アプリ。
+An iOS application that manages Notion tasks via a backend API, featuring AI-powered scheduling and calendar integration.
+
+## Features
+
+- **Task Management**: Fetch and add tasks to your Notion database through a secure API.
+- **AI Scheduling**: Automatically generate an optimized daily schedule using OpenAI's GPT-4o, considering task difficulty and existing calendar events.
+- **Calendar Integration**: Seamlessly sync your tasks with the Apple Calendar app.
+- **Smart Filtering & Sorting**: Filter tasks by status and sort them by deadline to stay on top of your work.
 
 ## Requirements
 
-- Xcode 16+
-- iOS 18+
+- Xcode 16.0+
+- iOS 18.0+
 
 ## Setup
 
-### 1. Config.plist を作成する
+### 1. Create Config.plist
+
+Copy the example configuration file and fill in your details:
 
 ```bash
 cp Config.plist.example daily-tasks/Config.plist
 ```
 
-`daily-tasks/Config.plist` を開いて `API_BASE_URL` に実際のURLを設定してください。
+Open `daily-tasks/Config.plist` and set the following:
+- `API_BASE_URL`: The URL of your backend API.
+- `API_KEY`: Your backend API key.
+- `OPEN_AI_API_KEY`: Your OpenAI API key for scheduling features.
 
-> ⚠️ `daily-tasks/Config.plist` は `.gitignore` に含まれているため、Git にはコミットされません。
+> ⚠️ `daily-tasks/Config.plist` is ignored by Git to keep your secrets safe.
 
-### 2. Xcode でビルド
+### 2. Build in Xcode
 
 ```bash
 open daily-tasks.xcodeproj
 ```
 
-Xcode で開いてビルド・実行（⌘R）してください。
-
-### 3. API Key を設定する
-
-初回起動時に API Key の入力画面が表示されます。
-入力した API Key は端末の Keychain に安全に保存されます。
+Open the project in Xcode and press `⌘R` to build and run.
 
 ## Architecture
 
+The project follows the **MVVM (Model-View-ViewModel)** pattern using the latest SwiftUI and Swift features:
+
 ```
 daily-tasks/
-├── Models/          # データモデル（Codable）
-├── Services/        # APIClient, KeychainService
-├── ViewModels/      # 画面ごとのロジック（@Observable）
-└── Views/           # SwiftUI 画面
+├── Models/          # Codable data models
+├── Services/        # Logic for API, OpenAI, and Calendar integration
+├── ViewModels/      # Business logic and state management using @Observable
+└── Views/           # Declarative SwiftUI views
 ```
 
-MVVM をベースにしたシンプルな構成です。
+## API Endpoints
 
-## API
+The app communicates with the following endpoints:
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | /api/tasks | X-API-Key | タスク一覧取得 |
-| POST | /api/tasks | X-API-Key | タスク追加 |
-| GET | /api/health | なし | ヘルスチェック |
+| GET | /api/tasks | X-API-Key | Fetch all tasks |
+| POST | /api/tasks | X-API-Key | Add a new task |
+| GET | /api/health | None | API health check |

@@ -1,16 +1,16 @@
 import SwiftUI
 
-/// タスク一覧画面 — APIからタスクを取得してリスト表示する
+/// Task list screen — fetches tasks from the API and displays them as a list
 struct TaskListView: View {
   @State private var viewModel = TaskListViewModel()
 
   var body: some View {
     Group {
       if viewModel.isLoading && viewModel.tasks.isEmpty {
-        // 初回読み込み中
+        // Initial loading
         ProgressView("読み込み中...")
       } else if let error = viewModel.errorMessage, viewModel.tasks.isEmpty {
-        // エラー表示（タスクがない場合のみ全画面表示）
+        // Error display (full-screen display only if no tasks exist)
         ContentUnavailableView {
           Label("エラー", systemImage: "exclamationmark.triangle")
         } description: {
@@ -22,7 +22,7 @@ struct TaskListView: View {
           .buttonStyle(.bordered)
         }
       } else {
-        // タスク一覧（ソート・フィルター適用後）
+        // Task list (after sorting and filtering)
         List(viewModel.filteredAndSortedTasks) { task in
           TaskRowView(task: task)
         }
@@ -61,25 +61,25 @@ struct TaskListView: View {
       }
     }
     .task {
-      // 画面表示時に自動でデータ取得
+      // Automatically fetch data when screen appears
       await viewModel.fetchTasks()
     }
   }
 }
 
-// MARK: - タスク1行分の表示
+// MARK: - Single Task Row Display
 
-/// リストの各行の見た目を定義する子View
+/// Child view that defines the appearance of each row in the list
 private struct TaskRowView: View {
   let task: TaskResponse
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      // タイトル
+      // Title
       Text(task.title)
         .font(.headline)
 
-      // 締切と見積もり
+      // Deadline and Estimate
       HStack(spacing: 12) {
         if let deadline = task.deadline {
           Label(deadline, systemImage: "calendar")
@@ -91,7 +91,7 @@ private struct TaskRowView: View {
       .font(.caption)
       .foregroundStyle(.secondary)
 
-      // 重要度とステータスのバッジ
+      // Priority and Status Badges
       HStack(spacing: 8) {
         if let priority = task.priority_label {
           BadgeView(text: priority, color: priorityColor(priority))
@@ -99,7 +99,7 @@ private struct TaskRowView: View {
         if let status = task.status {
           BadgeView(text: status, color: statusColor(status))
         }
-        // タスクタイプ
+        // Task Type
         ForEach(task.task_types, id: \.self) { type in
           BadgeView(text: type, color: .gray)
         }
@@ -108,7 +108,7 @@ private struct TaskRowView: View {
     .padding(.vertical, 4)
   }
 
-  /// 重要度に応じた色を返す
+  /// Returns the color based on priority
   private func priorityColor(_ priority: String) -> Color {
     switch priority {
     case "高": return .red
@@ -118,7 +118,7 @@ private struct TaskRowView: View {
     }
   }
 
-  /// ステータスに応じた色を返す
+  /// Returns the color based on status
   private func statusColor(_ status: String) -> Color {
     switch status {
     case "Done": return .green
@@ -130,7 +130,7 @@ private struct TaskRowView: View {
   }
 }
 
-/// 小さなバッジ表示用の汎用View
+/// Generic view for small badge display
 private struct BadgeView: View {
   let text: String
   let color: Color
