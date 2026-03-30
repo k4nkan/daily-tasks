@@ -6,5 +6,7 @@
 	<string>https://your-api-base-url.example.com</string>
 	<key>API_KEY</key>
 	<string>your-api-key-here</string>
+	<key>OPEN_AI_API_KEY</key>
+	<string>your-open-ai-api-key-here</string>
 </dict>
 </plist>
