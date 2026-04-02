@@ -60,7 +60,7 @@ class TaskAddViewModel {
     )
 
     do {
-      try await APIClient.createTask(request)
+      try await NotionService.createTask(request)
       didSubmitSuccessfully = true
     } catch {
       errorMessage = error.localizedDescription

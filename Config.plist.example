@@ -4,7 +4,7 @@
 <dict>
 	<key>NOTION_API_KEY</key>
 	<string>your-notion-api-key-here</string>
-	<key>NOTION_DATASORCE_ID</key>
+	<key>NOTION_DATA_SOURCE_ID</key>
 	<string>your-notion-datasource-id-here</string>
 	<key>OPEN_AI_API_KEY</key>
 	<string>your-open-ai-api-key-here</string>

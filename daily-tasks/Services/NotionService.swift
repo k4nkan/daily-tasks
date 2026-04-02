@@ -54,6 +54,82 @@ enum NotionService {
     return response.results.map { $0.toTaskResponse() }
   }
 
+  /// Creates a new task in Notion
+  static func createTask(_ task: TaskCreateRequest) async throws {
+    let apiKey = AppConfig.notionAPIKey
+    let dataSourceID = AppConfig.notionDataSourceID
+
+    guard !apiKey.isEmpty, !dataSourceID.isEmpty else {
+      throw NetworkError.serverError(401)
+    }
+
+    let urlString = "https://api.notion.com/v1/pages"
+    guard let url = URL(string: urlString) else { throw NetworkError.invalidURL }
+
+    let headers = [
+      "Authorization": "Bearer \(apiKey)",
+      "Notion-Version": "2026-03-11",
+      "Content-Type": "application/json",
+    ]
+
+    // Construct properties dynamically
+    var properties: [String: Any] = [
+      "Name": [
+        "title": [["text": ["content": task.title]]]
+      ],
+      "ステータス": [
+        "status": ["name": task.status ?? "Not started"]
+      ],
+    ]
+
+    if let summary = task.summary {
+      properties["タスク概要"] = [
+        "rich_text": [["text": ["content": summary]]]
+      ]
+    }
+
+    if let deadline = task.deadline {
+      properties["締切"] = [
+        "date": ["start": deadline]
+      ]
+    }
+
+    if let estimate = task.estimate_label {
+      properties["見積もり"] = [
+        "select": ["name": estimate]
+      ]
+    }
+
+    if let priority = task.priority_label {
+      properties["重要度"] = [
+        "select": ["name": priority]
+      ]
+    }
+
+    let body: [String: Any] = [
+      "parent": [
+        "type": "data_source_id",
+        "data_source_id": dataSourceID,
+      ],
+      "properties": properties,
+    ]
+
+    let bodyData: Data
+    do {
+      bodyData = try JSONSerialization.data(withJSONObject: body)
+    } catch {
+      throw NetworkError.decodingError(error)
+    }
+
+    // Notion returns the created page, but we don't need it for now
+    let _: NotionPage = try await NetworkManager.performRequest(
+      url: url,
+      method: "POST",
+      headers: headers,
+      body: bodyData
+    )
+  }
+
   // MARK: - Private Parser
 
   /// Helper to convert "1h" or "- 1.5h" to Int minutes
