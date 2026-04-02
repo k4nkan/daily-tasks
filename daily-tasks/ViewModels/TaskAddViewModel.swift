@@ -21,7 +21,6 @@ class TaskAddViewModel {
   // MARK: - Option Definitions (User-specified values)
   static let estimateOptions = ["- 0.5h", "- 1h", "- 1.5h", "- 2h", "- 3h", "- 4h", "4h -"]
   static let priorityOptions = ["高", "中", "低"]
-  static let statusOptions = ["Not started", "In progress", "Done", "stop"]
 
   /// Resets the form to the initial state after successful save
   func resetForm() {

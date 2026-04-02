@@ -44,16 +44,7 @@ struct TaskAddView: View {
         }
       }
 
-      // Status
-      Section("ステータス") {
-        Picker("ステータス", selection: $viewModel.status) {
-          ForEach(TaskAddViewModel.statusOptions, id: \.self) { option in
-            Text(option).tag(option)
-          }
-        }
-      }
-
-      // Error Message
+      // Submit Button
       if let error = viewModel.errorMessage {
         Section {
           Text(error)
