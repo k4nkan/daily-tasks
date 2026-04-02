@@ -94,7 +94,7 @@ class ScheduleViewModel {
   /// Generates a realistic and dynamic schedule using the OpenAI API
   private func buildSchedule() async throws {
     // 1. Fetch tasks and existing events
-    let allTasks = try await APIClient.fetchTasks()
+    let allTasks = try await NotionService.fetchTasks()
     let pendingTasks = allTasks.filter {
       let status = $0.status?.lowercased() ?? ""
       return status == "not started" || status == "in progress"

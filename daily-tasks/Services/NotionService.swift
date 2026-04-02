@@ -115,6 +115,25 @@ enum NotionService {
       throw NotionError.decodingError(error)
     }
   }
+
+  // MARK: - Private Parser
+
+  /// Helper to convert "1h" or "- 1.5h" to Int minutes
+  /// Based on TaskAddViewModel.estimateOptions
+  fileprivate static func parseEstimateToMinutes(_ label: String?) -> Int? {
+    guard let label = label else { return nil }
+
+    // Remove "- " and "h -" then find numeric parts
+    let cleanLabel = label.replacingOccurrences(of: "- ", with: "")
+      .replacingOccurrences(of: "h -", with: "")
+      .replacingOccurrences(of: "h", with: "")
+      .trimmingCharacters(in: .whitespaces)
+
+    if let hours = Double(cleanLabel) {
+      return Int(hours * 60)
+    }
+    return nil
+  }
 }
 
 // MARK: - Notion Response Mapping Structs
@@ -142,7 +161,7 @@ struct NotionPage: Codable {
       summary: summary,
       deadline: deadline,
       estimate_label: estimate,
-      estimate_minutes: nil,
+      estimate_minutes: NotionService.parseEstimateToMinutes(estimate),
       priority_label: nil,
       priority_value: nil,
       task_types: [],
