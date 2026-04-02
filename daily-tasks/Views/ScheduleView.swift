@@ -29,17 +29,61 @@ struct ScheduleView: View {
         } else {
           // Timeline display of the schedule
           List {
-            // Separate sections by date (only one day in this version)
+            // Date Selection and Generation Button
+            Section {
+              VStack(spacing: 16) {
+                DatePicker(
+                  "対象日",
+                  selection: Bindable(viewModel).selectedDate,
+                  displayedComponents: .date
+                )
+                .datePickerStyle(.compact)
+
+                Button {
+                  Task {
+                    await viewModel.loadAndSchedule()
+                  }
+                } label: {
+                  HStack {
+                    Spacer()
+                    if viewModel.isLoading {
+                      ProgressView()
+                        .padding(.trailing, 8)
+                    }
+                    Text("スケジュールを生成")
+                      .fontWeight(.bold)
+                    Spacer()
+                  }
+                  .padding(.vertical, 8)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.isLoading)
+              }
+              .padding(.vertical, 4)
+            }
+
+            // Separate sections by date
             let sortedDays = viewModel.scheduleSlots.keys.sorted()
-            ForEach(sortedDays, id: \.self) { day in
-              Section(header: Text(day, style: .date).font(.headline)) {
-                let slots = viewModel.scheduleSlots[day] ?? []
-                if slots.isEmpty {
-                  Text("予定なし")
-                    .foregroundStyle(.secondary)
-                } else {
-                  ForEach(slots) { slot in
-                    ScheduleSlotRow(slot: slot)
+
+            if sortedDays.isEmpty && !viewModel.isLoading {
+              Section {
+                ContentUnavailableView(
+                  "予定がありません",
+                  systemImage: "calendar.badge.plus",
+                  description: Text("日付を選択して生成ボタンを押してください")
+                )
+              }
+            } else {
+              ForEach(sortedDays, id: \.self) { day in
+                Section(header: Text(day, style: .date).font(.headline)) {
+                  let slots = viewModel.scheduleSlots[day] ?? []
+                  if slots.isEmpty {
+                    Text("予定なし")
+                      .foregroundStyle(.secondary)
+                  } else {
+                    ForEach(slots) { slot in
+                      ScheduleSlotRow(slot: slot)
+                    }
                   }
                 }
               }
@@ -73,8 +117,7 @@ struct ScheduleView: View {
         Text(viewModel.exportAlertMessage ?? "")
       }
       .task {
-        // Start generating the schedule when the screen appears
-        await viewModel.loadAndSchedule()
+        viewModel.checkAccessStatus()
       }
     }
   }

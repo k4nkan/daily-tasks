@@ -29,6 +29,7 @@ class ScheduleViewModel {
   var isLoading = false
   var errorMessage: String?
   var hasCalendarAccess = false
+  var selectedDate: Date = Calendar.current.startOfDay(for: Date())
 
   // For Export
   var isExporting = false
@@ -38,9 +39,7 @@ class ScheduleViewModel {
   /// Starts requesting calendar permissions and fetching data
   func loadAndSchedule() async {
     // Only show full-screen loading if we don't have slots yet
-    if scheduleSlots.isEmpty {
-      isLoading = true
-    }
+    isLoading = true
     errorMessage = nil
 
     do {
@@ -56,6 +55,16 @@ class ScheduleViewModel {
     }
 
     isLoading = false
+  }
+
+  /// Checks the current calendar permission status without prompting the user
+  func checkAccessStatus() {
+    let status = EKEventStore.authorizationStatus(for: .event)
+    if #available(iOS 17.0, *) {
+      hasCalendarAccess = status == .fullAccess || status == .authorized
+    } else {
+      hasCalendarAccess = status == .authorized
+    }
   }
 
   /// Batch writes events to the calendar
@@ -105,25 +114,23 @@ class ScheduleViewModel {
 
     let calendar = Calendar.current
     let now = Date()
-    let currentHour = calendar.component(.hour, from: now)
 
-    // If after 12 PM, schedule for tomorrow; otherwise, today
-    let targetDayOffset = currentHour >= 12 ? 1 : 0
-    guard let targetDayDate = calendar.date(byAdding: .day, value: targetDayOffset, to: now),
+    // Base start/end of day logic on selectedDate
+    guard
       let startOfActive = calendar.date(
-        bySettingHour: activeStartHour, minute: 0, second: 0, of: targetDayDate),
+        bySettingHour: activeStartHour, minute: 0, second: 0, of: selectedDate),
       let endOfActive = calendar.date(
-        bySettingHour: activeEndHour, minute: 0, second: 0, of: targetDayDate)
+        bySettingHour: activeEndHour, minute: 0, second: 0, of: selectedDate)
     else {
       return
     }
 
     let events = CalendarService.shared.fetchEvents(startDate: startOfActive, endDate: endOfActive)
-    let dayKey = calendar.startOfDay(for: targetDayDate)
+    let dayKey = calendar.startOfDay(for: selectedDate)
 
     // 2. Create prompt for OpenAI
     let prompt = constructAIPrompt(
-      targetDate: targetDayDate,
+      targetDate: selectedDate,
       currentTime: now,
       startHour: activeStartHour,
       endHour: activeEndHour,
