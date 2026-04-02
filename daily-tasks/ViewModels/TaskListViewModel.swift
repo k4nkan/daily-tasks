@@ -68,7 +68,7 @@ class TaskListViewModel {
     errorMessage = nil
 
     do {
-      tasks = try await APIClient.fetchTasks()
+      tasks = try await NotionService.fetchTasks()
     } catch {
       errorMessage = error.localizedDescription
     }

@@ -2,10 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>API_BASE_URL</key>
-	<string>https://your-api-base-url.example.com</string>
-	<key>API_KEY</key>
-	<string>your-api-key-here</string>
+	<key>NOTION_API_KEY</key>
+	<string>your-notion-api-key-here</string>
+	<key>NOTION_DATASORCE_ID</key>
+	<string>your-notion-datasource-id-here</string>
 	<key>OPEN_AI_API_KEY</key>
 	<string>your-open-ai-api-key-here</string>
 </dict>
