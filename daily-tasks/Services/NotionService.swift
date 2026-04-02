@@ -68,18 +68,18 @@ enum NotionService {
     request.setValue("2026-03-11", forHTTPHeaderField: "Notion-Version")
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-    // Filter body for "Not started" or "In progress"
+    // Filter to only get "Not started" or "In progress" tasks
     let filterBody: [String: Any] = [
       "filter": [
         "or": [
           [
             "property": "ステータス",
-            "status": ["equals": "Not started"],
+            "status": ["equals": "Not started"]
           ],
           [
             "property": "ステータス",
-            "status": ["equals": "In progress"],
-          ],
+            "status": ["equals": "In progress"]
+          ]
         ]
       ]
     ]
@@ -150,9 +150,9 @@ struct NotionPage: Codable {
   /// Maps Notion's complex structure back to our TaskResponse model
   func toTaskResponse() -> TaskResponse {
     let title = properties.Name.title.first?.plain_text ?? "No Title"
-    let status = properties.status.status?.name
-    let deadline = properties.deadline.date?.start
-    let estimate = properties.estimate.select?.name
+    let status = properties.status?.status?.name
+    let deadline = properties.deadline?.date?.start
+    let estimate = properties.estimate?.select?.name
     let summary = properties.summary?.rich_text.first?.plain_text
 
     return TaskResponse(
@@ -162,9 +162,9 @@ struct NotionPage: Codable {
       deadline: deadline,
       estimate_label: estimate,
       estimate_minutes: NotionService.parseEstimateToMinutes(estimate),
-      priority_label: nil,
+      priority_label: properties.priority?.select?.name,
       priority_value: nil,
-      task_types: [],
+      task_types: properties.taskTypes?.multi_select.map { $0.name } ?? [],
       status: status
     )
   }
@@ -172,9 +172,11 @@ struct NotionPage: Codable {
 
 struct NotionProperties: Codable {
   let Name: NotionTitleProperty
-  let status: NotionStatusProperty
-  let deadline: NotionDateProperty
-  let estimate: NotionSelectProperty
+  let status: NotionStatusProperty?
+  let deadline: NotionDateProperty?
+  let estimate: NotionSelectProperty?
+  let priority: NotionSelectProperty?
+  let taskTypes: NotionMultiSelectProperty?
   let summary: NotionRichTextProperty?
 
   enum CodingKeys: String, CodingKey {
@@ -182,6 +184,8 @@ struct NotionProperties: Codable {
     case status = "ステータス"
     case deadline = "締切"
     case estimate = "見積もり"
+    case priority = "重要度"
+    case taskTypes = "タスクタイプ"
     case summary = "タスク概要"
   }
 }
@@ -220,4 +224,8 @@ struct NotionSelectProperty: Codable {
 
 struct NotionSelect: Codable {
   let name: String
+}
+
+struct NotionMultiSelectProperty: Codable {
+  let multi_select: [NotionSelect]
 }

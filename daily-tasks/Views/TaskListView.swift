@@ -74,12 +74,13 @@ private struct TaskRowView: View {
   let task: TaskResponse
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      // Title
+    VStack(alignment: .leading, spacing: 8) {
+      // Line 1: Title
       Text(task.title)
         .font(.headline)
+        .foregroundColor(.primary)
 
-      // Summary
+      // Line 2: Summary
       if let summary = task.summary, !summary.isEmpty {
         Text(summary)
           .font(.footnote)
@@ -87,8 +88,8 @@ private struct TaskRowView: View {
           .lineLimit(2)
       }
 
-      // Deadline and Estimate
-      HStack(spacing: 12) {
+      // Line 3: Deadline and Estimate
+      HStack(spacing: 16) {
         if let deadline = task.deadline {
           Label(deadline, systemImage: "calendar")
         }
@@ -99,7 +100,7 @@ private struct TaskRowView: View {
       .font(.caption)
       .foregroundStyle(.secondary)
 
-      // Priority and Status Badges
+      // Line 4: Priority and Status Badges
       HStack(spacing: 8) {
         if let priority = task.priority_label {
           BadgeView(text: priority, color: priorityColor(priority))
@@ -107,13 +108,13 @@ private struct TaskRowView: View {
         if let status = task.status {
           BadgeView(text: status, color: statusColor(status))
         }
-        // Task Type
+        // Task Type (Categories)
         ForEach(task.task_types, id: \.self) { type in
           BadgeView(text: type, color: .gray)
         }
       }
     }
-    .padding(.vertical, 4)
+    .padding(.vertical, 8)
   }
 
   /// Returns the color based on priority
