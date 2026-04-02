@@ -26,6 +26,8 @@ class TaskListViewModel {
   var sortOption: SortOption = .deadlineAsc  // Default is Nearest Deadline
   var displayMode: DisplayMode = .all  // Default is All
 
+  // MARK: - Computed Properties
+
   /// Task list with sorting and filtering applied
   var filteredAndSortedTasks: [TaskResponse] {
     // 1. Filter
@@ -44,7 +46,7 @@ class TaskListViewModel {
     switch sortOption {
     case .deadlineAsc:
       result.sort { (task1, task2) -> Bool in
-        // Tasks with nil deadline go to the back
+        // Combine logical guard for nil to sort them at the back
         guard let d1 = task1.deadline else { return false }
         guard let d2 = task2.deadline else { return true }
         return d1 < d2
@@ -52,7 +54,6 @@ class TaskListViewModel {
 
     case .deadlineDesc:
       result.sort { (task1, task2) -> Bool in
-        // Tasks with nil deadline go to the back
         guard let d1 = task1.deadline else { return false }
         guard let d2 = task2.deadline else { return true }
         return d1 > d2
@@ -61,6 +62,8 @@ class TaskListViewModel {
 
     return result
   }
+
+  // MARK: - Public Methods
 
   /// Fetches the task list from the API
   func fetchTasks() async {

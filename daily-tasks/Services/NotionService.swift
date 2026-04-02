@@ -1,72 +1,25 @@
 import Foundation
 
-// MARK: - Notion Error
-
-enum NotionError: LocalizedError {
-  case invalidURL
-  case missingCredentials
-  case networkError(Error)
-  case decodingError(Error)
-  case serverError(Int)
-
-  var errorDescription: String? {
-    switch self {
-    case .invalidURL:
-      return "URLが無効です（Notion）"
-    case .missingCredentials:
-      return "Config.plist に NOTION_API_KEY または NOTION_DATASORCE_ID が設定されていません"
-    case .networkError(let error):
-      return "通信エラー（Notion）: \(error.localizedDescription)"
-    case .decodingError:
-      return "Notion からのレスポンス解析に失敗しました"
-    case .serverError(let code):
-      return "Notion サーバーエラー (HTTP \(code))"
-    }
-  }
-}
-
-// MARK: - Notion Service
-
 /// Directly calls the Notion API to fetch tasks
 enum NotionService {
 
-  /// Loads configuration from Config.plist
-  private static var configDict: [String: Any]? {
-    guard let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
-      let dict = NSDictionary(contentsOfFile: path) as? [String: Any]
-    else {
-      return nil
-    }
-    return dict
-  }
-
-  private static var apiKey: String? {
-    configDict?["NOTION_API_KEY"] as? String
-  }
-
-  private static var dataSourceID: String? {
-    configDict?["NOTION_DATA_SOURCE_ID"] as? String
-  }
-
-  // MARK: - Public Methods
-
   /// Fetches tasks directly from Notion
   static func fetchTasks() async throws -> [TaskResponse] {
-    guard let apiKey = apiKey, let dataSourceID = dataSourceID,
-      !apiKey.isEmpty, !dataSourceID.isEmpty
-    else {
-      throw NotionError.missingCredentials
+    let apiKey = AppConfig.notionAPIKey
+    let dataSourceID = AppConfig.notionDataSourceID
+
+    guard !apiKey.isEmpty, !dataSourceID.isEmpty else {
+      throw NetworkError.serverError(401)  // Or a more specific error
     }
 
-    // According to NOTION_FETCH_GUIDE.md, using data_sources endpoint
     let urlString = "https://api.notion.com/v1/data_sources/\(dataSourceID)/query"
-    guard let url = URL(string: urlString) else { throw NotionError.invalidURL }
+    guard let url = URL(string: urlString) else { throw NetworkError.invalidURL }
 
-    var request = URLRequest(url: url)
-    request.httpMethod = "POST"
-    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-    request.setValue("2026-03-11", forHTTPHeaderField: "Notion-Version")
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let headers = [
+      "Authorization": "Bearer \(apiKey)",
+      "Notion-Version": "2026-03-11",
+      "Content-Type": "application/json",
+    ]
 
     // Filter to only get "Not started" or "In progress" tasks
     let filterBody: [String: Any] = [
@@ -74,46 +27,31 @@ enum NotionService {
         "or": [
           [
             "property": "ステータス",
-            "status": ["equals": "Not started"]
+            "status": ["equals": "Not started"],
           ],
           [
             "property": "ステータス",
-            "status": ["equals": "In progress"]
-          ]
+            "status": ["equals": "In progress"],
+          ],
         ]
       ]
     ]
 
+    let bodyData: Data
     do {
-      request.httpBody = try JSONSerialization.data(withJSONObject: filterBody)
+      bodyData = try JSONSerialization.data(withJSONObject: filterBody)
     } catch {
-      throw NotionError.decodingError(error)
+      throw NetworkError.decodingError(error)
     }
 
-    let data: Data
-    let response: URLResponse
+    let response: NotionResponse = try await NetworkManager.performRequest(
+      url: url,
+      method: "POST",
+      headers: headers,
+      body: bodyData
+    )
 
-    do {
-      (data, response) = try await URLSession.shared.data(for: request)
-    } catch {
-      throw NotionError.networkError(error)
-    }
-
-    guard let httpResponse = response as? HTTPURLResponse else {
-      throw NotionError.networkError(NSError(domain: "HTTPError", code: -1))
-    }
-
-    guard (200...299).contains(httpResponse.statusCode) else {
-      throw NotionError.serverError(httpResponse.statusCode)
-    }
-
-    do {
-      let notionResponse = try JSONDecoder().decode(NotionResponse.self, from: data)
-      return notionResponse.results.map { $0.toTaskResponse() }
-    } catch {
-      print("Notion Decoding Error: \(error)")
-      throw NotionError.decodingError(error)
-    }
+    return response.results.map { $0.toTaskResponse() }
   }
 
   // MARK: - Private Parser

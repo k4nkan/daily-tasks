@@ -4,29 +4,17 @@ import Foundation
 class OpenAIService {
   static let shared = OpenAIService()
 
-  // Reads API Key from Config.plist
-  private var apiKey: String? {
-    guard let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
-      let dict = NSDictionary(contentsOfFile: path) as? [String: Any]
-    else {
-      return nil
-    }
-    return dict["OPEN_AI_API_KEY"] as? String
-  }
-
   private let baseURL = "https://api.openai.com/v1/chat/completions"
 
   /// Sends a prompt to OpenAI and fetches a structured schedule (JSON)
   func generateSchedule(prompt: String) async throws -> AIScheduleResponse {
-    guard let apiKey = apiKey else {
-      throw NSError(
-        domain: "OpenAIService", code: 1,
-        userInfo: [NSLocalizedDescriptionKey: "OPEN_AI_API_KEY が Config.plist に設定されていません"])
+    let apiKey = AppConfig.openAIKey
+    guard !apiKey.isEmpty else {
+      throw NetworkError.unauthorized
     }
 
     guard let url = URL(string: baseURL) else {
-      throw NSError(
-        domain: "OpenAIService", code: 2, userInfo: [NSLocalizedDescriptionKey: "無効なURLです"])
+      throw NetworkError.invalidURL
     }
 
     // Create request body
@@ -39,57 +27,42 @@ class OpenAIService {
       "response_format": ["type": "json_object"],
     ]
 
-    var request = URLRequest(url: url)
-    request.httpMethod = "POST"
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-    request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+    let headers = [
+      "Content-Type": "application/json",
+      "Authorization": "Bearer \(apiKey)",
+    ]
 
-    let (data, response) = try await URLSession.shared.data(for: request)
-
-    if let httpResponse = response as? HTTPURLResponse,
-      !(200...299).contains(httpResponse.statusCode)
-    {
-      let errorBody = String(data: data, encoding: .utf8) ?? "unknown error"
-      print("❌ OpenAI API Error Status: \(httpResponse.statusCode)\nBody: \(errorBody)")
-      throw NSError(
-        domain: "OpenAIService", code: 3,
-        userInfo: [NSLocalizedDescriptionKey: "OpenAI API エラー (HTTP \(httpResponse.statusCode))"])
-    }
-
-    // Parse OpenAI response
-    let decodedResponse: OpenAIResponse
+    let bodyData: Data
     do {
-      decodedResponse = try JSONDecoder().decode(OpenAIResponse.self, from: data)
+      bodyData = try JSONSerialization.data(withJSONObject: requestBody)
     } catch {
-      print("❌ OpenAI Response Decoding Error: \(error)")
-      if let rawString = String(data: data, encoding: .utf8) {
-        print("Raw Response Body: \(rawString)")
-      }
-      throw error
+      throw NetworkError.decodingError(error)
     }
 
-    guard let jsonString = decodedResponse.choices.first?.message.content else {
-      print("❌ OpenAI returned no content.")
-      throw NSError(
-        domain: "OpenAIService", code: 4,
-        userInfo: [NSLocalizedDescriptionKey: "OpenAI からの有効な回答が得られませんでした"])
+    // 1. Fetch response from OpenAI
+    let openAIResponse: OpenAIResponse = try await NetworkManager.performRequest(
+      url: url,
+      method: "POST",
+      headers: headers,
+      body: bodyData
+    )
+
+    // 2. Extract nested JSON content
+    guard let jsonString = openAIResponse.choices.first?.message.content,
+      let jsonData = jsonString.data(using: .utf8)
+    else {
+      throw NetworkError.decodingError(
+        NSError(
+          domain: "OpenAIService", code: -1,
+          userInfo: [NSLocalizedDescriptionKey: "OpenAI returned empty content"]))
     }
 
-    // Convert JSON string to data
-    guard let jsonData = jsonString.data(using: .utf8) else {
-      print("❌ Failed to convert OpenAI text to UTF8 data: \(jsonString)")
-      throw NSError(
-        domain: "OpenAIService", code: 5,
-        userInfo: [NSLocalizedDescriptionKey: "OpenAI の回答を解析できませんでした"])
-    }
-
+    // 3. Decode the actual schedule
     do {
       return try JSONDecoder().decode(AIScheduleResponse.self, from: jsonData)
     } catch {
-      print("❌ OpenAI Schedule JSON Decoding Error: \(error)")
-      print("Attempted JSON string: \(jsonString)")
-      throw error
+      print("❌ [OpenAIService] Schedule Decoding Error: \(error)")
+      throw NetworkError.decodingError(error)
     }
   }
 }
